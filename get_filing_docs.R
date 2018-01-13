@@ -1,6 +1,7 @@
 library(dplyr, warn.conflicts = FALSE)
 library(RPostgreSQL)
 library(rvest)
+library(parallel)
 
 get_index_url <- function(file_name) {
     matches <- stringr::str_match(file_name, "/(\\d+)/(\\d{10}-\\d{2}-\\d{6})")
@@ -49,7 +50,7 @@ filings <- tbl(pg, sql("SELECT * FROM edgar.filings"))
 
 def14_a <-
     filings %>%
-    filter(form_type %~% "^8-K")
+    filter(form_type %~% "^6-K")
 
 new_table <- !dbExistsTable(pg, c("edgar", "filing_docs"))
 
@@ -65,7 +66,10 @@ file_names <-
     collect()
 dbDisconnect(pg)
 
+system.time(temp <- mclapply(file_names$file_name, get_filing_docs, mc.cores=16))
+
 system.time(temp <- lapply(file_names$file_name, get_filing_docs))
+
 
 if (new_table) {
     pg <- dbConnect(PostgreSQL())
